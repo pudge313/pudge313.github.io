@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+<title>Тренажёр опробования ТЗ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=PT+Mono&family=PT+Sans+Narrow:wght@700&family=PT+Sans:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* Layout: пульт опробования — слева «экран» со схемой защиты, справа этапы, окно контроля и подсказки; на телефоне всё в одну колонку */
+:root{
+  --bg:#e7eef0; --surface:#fbfdfd; --surface-2:#eff5f6; --fg:#11232a; --muted:#566a71; --line:#c7d5d9;
+  --accent:#0a6879; --accent-fg:#ffffff; --accent-soft:#d6ecf0;
+  --ok:#1a7743; --ok-bg:#def1e6; --bad:#ae2419; --bad-bg:#f9e3df; --warn:#875700; --warn-bg:#f8eed4;
+  --scrim:rgba(10,24,30,.55);
+  /* «экран» симулятора: одинаков в обеих темах, как настоящий монитор */
+  --scr:#20c3df; --scr-edge:#0d8ba1; --ink:#061418; --gate:#b3babd; --panel:#c2c8cb; --paper:#ffffff; --hot:#cf001b;
+  --lit-red:#ff2d2d; --lit-red-d:#9e0000; --lit-yel:#ffd60a; --lit-yel-d:#a37f00; --blink:#ffe100;
+  --v-open:#e3262e; --v-closed:#1d9a3b; --pipe:#1a3ea6; --sensor:#ffd400; --sensor-off:#9aa3a7; --l220:#2fbf3a; --l220-off:#8d969a;
+  --f-body:"PT Sans","Segoe UI",Roboto,Arial,sans-serif;
+  --f-head:"PT Sans Narrow","Arial Narrow","PT Sans",sans-serif;
+  --f-mono:"PT Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e191c; --surface:#152429; --surface-2:#1b2d33; --fg:#e2edf0; --muted:#93a8ae; --line:#2a414a;
+  --accent:#55c3d6; --accent-fg:#05212a; --accent-soft:#163a43;
+  --ok:#6cd596; --ok-bg:#12301f; --bad:#ff8f84; --bad-bg:#3b1813; --warn:#f2c35c; --warn-bg:#3a2c0d;
+  --scrim:rgba(0,0,0,.6); --scr:#1aaec8; --scr-edge:#0b7486; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0e191c; --surface:#152429; --surface-2:#1b2d33; --fg:#e2edf0; --muted:#93a8ae; --line:#2a414a;
+  --accent:#55c3d6; --accent-fg:#05212a; --accent-soft:#163a43;
+  --ok:#6cd596; --ok-bg:#12301f; --bad:#ff8f84; --bad-bg:#3b1813; --warn:#f2c35c; --warn-bg:#3a2c0d;
+  --scrim:rgba(0,0,0,.6); --scr:#1aaec8; --scr-edge:#0b7486; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+button,select,input{font:inherit;color:inherit}
+.app{max-width:1340px;margin:0 auto;padding-block:14px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px}
+
+/* шапка */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 20px}
+.brand h1{font-family:var(--f-head);font-size:26px;line-height:1.05;margin:0;letter-spacing:.01em;text-wrap:balance}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);font-weight:700}
+.seg button:focus-visible,.btn:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.controls-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.seg small{opacity:.75;font-weight:400}
+
+/* полоса задачи */
+.taskbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.taskbar h2{margin:0;font-size:16px;font-weight:700;text-wrap:balance}
+.meters{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.meter{display:flex;flex-direction:column;line-height:1.1}
+.meter span{font-family:var(--f-body);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.meter b{font-size:20px}
+.meter b.has-err{color:var(--bad)}
+
+/* рабочая область */
+.work{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;align-items:start}
+@media (max-width:1020px){.work{grid-template-columns:minmax(0,1fr)}}
+.screen-wrap{overflow-x:auto;border-radius:8px;border:3px solid var(--scr-edge);background:var(--scr)}
+.screen{min-width:680px;padding:10px 10px 6px}
+.banner{display:flex;justify-content:center;margin-bottom:4px}
+.banner div{background:var(--paper);color:var(--ink);border:1px solid var(--ink);padding:4px 14px;font-weight:700;font-size:15px;min-width:60%;text-align:center}
+.banner div.idle{font-weight:400;color:#4b5a5f}
+#scheme svg{display:block;width:100%;height:auto}
+.side{display:grid;gap:12px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.card h3{margin:0 0 8px;font-family:var(--f-head);font-size:17px;letter-spacing:.02em}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+select:disabled{opacity:.7}
+.btn{border:1px solid var(--line);background:var(--surface-2);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.wide{flex:1 1 auto}
+.stage-now{font-size:13px;color:var(--muted);margin:8px 0 0}
+
+/* сообщения */
+.msg{border-radius:8px;padding:10px 12px;font-size:14px;background:var(--surface-2);border:1px solid var(--line)}
+.msg b.tag{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px}
+.msg.bad{background:var(--bad-bg);border-color:transparent;color:var(--fg)} .msg.bad b.tag{color:var(--bad)}
+.msg.ok{background:var(--ok-bg);border-color:transparent} .msg.ok b.tag{color:var(--ok)}
+.msg.warn{background:var(--warn-bg);border-color:transparent} .msg.warn b.tag{color:var(--warn)}
+.msg ul{margin:6px 0 0;padding-left:18px}
+
+/* окно контроля */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:6px}
+.cell{border:1px solid var(--line);border-radius:8px;padding:6px;display:grid;gap:4px;background:var(--surface-2);margin:0;min-width:0}
+.cell legend,.cell .ct{font-weight:700;font-size:13px;padding:0;float:left;width:100%}
+.cell.wide{grid-column:1/-1}
+.cell.wide .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px}
+.opts{display:grid;gap:4px}
+.opt input{position:absolute;opacity:0;width:1px;height:1px}
+.opt span{display:block;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px;cursor:pointer;background:var(--surface);text-align:center}
+.opt input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:700}
+.opt input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.cell.diff{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset}
+.ctrl-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* подсказки и ход */
+.subs{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:14px}
+.subs li{display:grid;grid-template-columns:22px 1fr;gap:6px;align-items:start}
+.mark{font-family:var(--f-mono);font-weight:700;text-align:center;border-radius:4px;font-size:13px;line-height:20px}
+.mark.ok{background:var(--ok-bg);color:var(--ok)} .mark.bad{background:var(--bad-bg);color:var(--bad)}
+.mark.cur{background:var(--accent);color:var(--accent-fg)} .mark.wait{color:var(--muted);border:1px dashed var(--line)}
+.hint-text{font-size:14px;margin:0}
+.reveal{margin-top:8px;font-size:13px;background:var(--surface-2);border-radius:6px;padding:8px}
+.muted{color:var(--muted)}
+.foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+details.log{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px}
+details.log summary{cursor:pointer;font-weight:700}
+details.log ol{margin:8px 0 0;padding-left:22px;font-family:var(--f-mono);font-size:13px;max-height:260px;overflow:auto}
+
+/* протокол */
+.overlay{position:fixed;inset:0;background:var(--scrim);z-index:20;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:calc(20px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.sheet{background:var(--surface);color:var(--fg);border-radius:12px;max-width:980px;width:100%;padding:18px;display:grid;gap:12px}
+.sheet h2{margin:0;font-family:var(--f-head);font-size:22px}
+.tbl-wrap{overflow-x:auto}
+table.proto{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+.proto th,.proto td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:left}
+.proto th{background:var(--accent-soft)}
+.proto td.pm{font-family:var(--f-mono);font-weight:700;text-align:center;width:90px}
+.pm.plus{color:var(--ok)} .pm.minus{color:var(--bad)}
+.proto tr.gross td{background:var(--bad-bg)}
+.proto .acts{font-family:var(--f-mono);font-size:12.5px;white-space:pre-line}
+.proto b.okt{color:var(--ok)} .proto b.badt{color:var(--bad)}
+
+/* SVG схемы */
+svg text{font-family:var(--f-body);fill:var(--ink)}
+.lbl,.glbl,.blbl,.state,.small,.togl{text-anchor:middle}
+.lbl{font-size:13px;font-weight:700}
+.nm{font-size:15px;font-weight:700}
+.glbl{font-size:13px;font-weight:700}
+.blbl{font-size:13px;font-weight:700}
+.state{font-size:10px;font-weight:700;letter-spacing:.03em}
+.small{font-size:10px} .small.b{font-size:11.5px;font-weight:700}
+.small-i{font-size:11px;font-style:italic;text-anchor:middle}
+.togl{font-size:13px;font-weight:700}
+.desc{font-size:13px;font-weight:700;text-anchor:start}
+.read{font-family:var(--f-mono)!important;font-size:14px;font-weight:700}
+.w{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.w.on{stroke:var(--hot);stroke-width:2.6}
+.dot{fill:var(--ink)} .dot.on{fill:var(--hot)}
+.pipe{fill:none;stroke:var(--pipe);stroke-width:3}
+.mag{stroke:var(--pipe);stroke-width:7}
+.gate{fill:var(--gate);stroke:var(--ink);stroke-width:1.5}
+.box{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+.paper{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+.inv{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+.dash{fill:none;stroke:var(--ink);stroke-width:1.2;stroke-dasharray:4 3}
+.panel{fill:var(--panel);stroke:var(--ink);stroke-width:2}
+.term{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+.bar{stroke:var(--ink);stroke-width:3;stroke-linecap:round}
+.blade{stroke:var(--ink);stroke-width:2.4;stroke-linecap:round}
+.needle{stroke:var(--hot);stroke-width:3;stroke-linecap:round}
+.blk{fill:var(--gate);stroke:var(--ink);stroke-width:1.5}
+.blk.down{fill:var(--blink)}
+.sensor{fill:var(--sensor);stroke:var(--ink);stroke-width:1.5}
+.sensor.off{fill:var(--sensor-off)}
+.plug{fill:var(--ink)} .plug.off{fill:var(--paper);stroke:var(--ink);stroke-width:1.5;stroke-dasharray:2 2}
+.valve{stroke:var(--ink);stroke-width:1}
+.valve.open{fill:var(--v-open)} .valve.closed{fill:var(--v-closed)}
+.lamp .lb{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+.lamp .lq{fill:var(--ink)}
+.lamp.red.lit .lb{fill:var(--lit-red)} .lamp.red.lit .lq{fill:var(--lit-red-d)}
+.lamp.yel.lit .lb{fill:var(--lit-yel)} .lamp.yel.lit .lq{fill:var(--lit-yel-d)}
+.l220{fill:var(--l220-off);stroke:var(--ink);stroke-width:1}
+.l220.on{fill:var(--l220)}
+.tog{fill:#e5e8ea;stroke:var(--ink);stroke-width:1.5}
+.kbtn{fill:#e5e8ea;stroke:var(--ink);stroke-width:1.5}
+.ktri{fill:var(--ink)}
+.btnbox{fill:var(--paper);stroke:var(--ink);stroke-width:2}
+.btnbox-t{font-size:15px;font-weight:700;text-anchor:middle}
+.cvd{fill:#f07a2a;stroke:#9a3d00;stroke-width:1.5}
+.ylw{fill:#ffd21a;stroke:var(--ink);stroke-width:1}
+.blu{fill:#1f4fe0} .red{fill:#e01b1b}
+.hit{cursor:pointer}
+.hit:hover .paper,.hit:hover .blk,.hit:hover .sensor,.hit:hover .tog,.hit:hover .kbtn,.hit:hover .btnbox,.hit:hover .hitbox{stroke:var(--hot);stroke-width:2.4}
+.hit:focus{outline:none}
+.hit:focus-visible .paper,.hit:focus-visible .blk,.hit:focus-visible .sensor,.hit:focus-visible .tog,.hit:focus-visible .kbtn,.hit:focus-visible .btnbox,.hit:focus-visible .hitbox{stroke:var(--hot);stroke-width:3}
+.hitbox{fill:transparent;stroke:transparent}
+.kbtn:active{fill:#cfd5d8}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Опробование технологических защит</h1>
+      <p>Тренажёр к лабораторным работам по технологическим защитам котлоагрегатов</p>
+    </div>
+    <div class="controls-top">
+      <div class="seg" id="lab-tabs" role="group" aria-label="Лабораторная работа"></div>
+      <div class="seg" id="mode-tabs" role="group" aria-label="Режим">
+        <button type="button" data-mode="train" id="mode-train">Обучение</button>
+        <button type="button" data-mode="exam" id="mode-exam">Экзамен</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="taskbar">
+    <h2 id="task-title"></h2>
+    <div class="meters">
+      <div class="meter" title="Грубые / обычные ошибки"><span>Ошибок</span><b id="err">0/0</b></div>
+      <div class="meter"><span>Время</span><b id="time">00:00:00</b></div>
+      <button class="btn" type="button" id="btn-reset">Начать заново</button>
+    </div>
+  </section>
+
+  <main class="work">
+    <div class="screen-wrap">
+      <div class="screen">
+        <div class="banner"><div id="banner" class="idle">&lt;выберите этап для выполнения&gt;</div></div>
+        <div id="scheme"></div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3>Этап опробования</h3>
+        <select id="stage-sel" aria-label="Этап для выполнения"></select>
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary wide" type="button" id="btn-stage" disabled>Этап выполнен</button>
+        </div>
+        <p class="stage-now" id="stage-now"></p>
+      </div>
+
+      <div class="msg" id="msg" aria-live="polite"><b class="tag">Как работать</b>Выберите этап в списке, выполните действия на схеме (элементы нажимаются), опишите состояние схемы в окне контроля.</div>
+
+      <div class="card">
+        <h3>Контроль условий опробования</h3>
+        <div id="ctrl"></div>
+        <div class="ctrl-actions" id="ctrl-actions">
+          <button class="btn primary wide" type="button" id="btn-ctrl">Контроль выполнен</button>
+        </div>
+      </div>
+
+      <div class="card" id="hint-card">
+        <h3>Подсказка</h3>
+        <div id="hint"></div>
+      </div>
+
+      <div class="card">
+        <h3>Ход опробования</h3>
+        <ul class="subs" id="progress"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <div class="foot">
+    <details class="log" id="log-box"><summary>Журнал действий</summary><ol id="log"></ol></details>
+    <button class="btn primary" type="button" id="btn-finish">Опробование завершено</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="proto-title">
+    <h2 id="proto-title">Протокол опробования</h2>
+    <div id="proto"></div>
+    <div class="row">
+      <button class="btn" type="button" id="btn-close">Вернуться к схеме</button>
+      <button class="btn primary" type="button" id="btn-again">Пройти заново</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- примитивы SVG ---------- */
+const R=(x,y,w,h,c,e='')=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" class="${c}" ${e}/>`;
+const T=(x,y,s,c='lbl',e='')=>`<text x="${x}" y="${y}" class="${c}" ${e}>${s}</text>`;
+const W=(p,s)=>`<polyline class="w"${s?` data-s="${s}"`:''} points="${p}"/>`;
+const PIPE=p=>`<polyline class="pipe" points="${p}"/>`;
+const DOT=(x,y,s)=>`<circle class="dot"${s?` data-s="${s}"`:''} cx="${x}" cy="${y}" r="3"/>`;
+const ARROW=(x,y,dir,s)=>{const d={r:`${x},${y} ${x-8},${y-4} ${x-8},${y+4}`,d:`${x},${y} ${x-4},${y-8} ${x+4},${y-8}`}[dir];return `<polygon class="dot"${s?` data-s="${s}"`:''} points="${d}"/>`};
+const GATE=(x,y,w,h,l,inv=[])=>R(x,y,w,h,'gate')+T(x+w/2,y+15,l,'glbl')+inv.map(iy=>`<circle class="inv" cx="${x-3.5}" cy="${iy}" r="3.5"/>`).join('');
+const BOX=(x,y,w,h,l)=>R(x,y,w,h,'box')+T(x+w/2,y+h/2+5,l,'blbl');
+const HIT=(id,label,inner)=>`<g class="hit" data-act="${id}" role="button" tabindex="0" aria-label="${label}">${inner}</g>`;
+function LAMP(id,x,y,col){return `<g id="${id}" class="lamp ${col}"><circle cx="${x}" cy="${y}" r="13" class="lb"/><path class="lq" d="M${x} ${y}L${x-9.19} ${y-9.19}A13 13 0 0 0 ${x-9.19} ${y+9.19}Z M${x} ${y}L${x+9.19} ${y-9.19}A13 13 0 0 1 ${x+9.19} ${y+9.19}Z"/></g>`}
+const GEO={};
+function NAK(id,x,y,w,h,name,label){
+  const cy=y+h/2; GEO[id]={x1:x+9,x2:x+w-9,cy,top:y+4};
+  return HIT(id,label,R(x,y,w,h,'paper')+`<circle cx="${x+9}" cy="${cy}" r="3.2" class="term"/><circle cx="${x+w-9}" cy="${cy}" r="3.2" class="term"/><line id="${id}-bar" class="bar" x1="${x+9}" y1="${cy}" x2="${x+w-9}" y2="${cy}"/>`)
+    +T(x+w/2,y+h+12,'','state',`id="${id}-st"`)+T(x+w/2,y-5,name,'nm');
+}
+const BLK=(id,x,y,w,h,l,label)=>HIT(id,label,`<rect id="${id}-r" x="${x}" y="${y}" width="${w}" height="${h}" class="blk"/>`+T(x+w/2,y+h/2+5,l,'blbl'));
+function VALVE(id,x,y,vert,label){
+  const pts=vert?`${x-7},${y-9} ${x+7},${y+9} ${x-7},${y+9} ${x+7},${y-9}`:`${x-9},${y-7} ${x+9},${y+7} ${x+9},${y-7} ${x-9},${y+7}`;
+  const poly=`<polygon ${id?`id="${id}-p" `:''}class="valve open" points="${pts}"/>`;
+  return id?HIT(id,label,R(x-14,y-14,28,28,'hitbox')+poly):poly;
+}
+
+/* ---------- общие тексты ---------- */
+const VMSG='Выбор этапа без визуального контроля и подготовки схемы к опробованию!';
+const LAMPKEYS=['p1','p2','b1','b2','L','L1','L2','L3','LS'];
+const LAMPNAMES={p1:'Лампа1 ~220',p2:'Лампа2 ~220',b1:'Блинкер 1',b2:'Блинкер 2',L:'Л',L1:'Л1',L2:'Л2',L3:'Л3',LS:'ЛС'};
+const isBl=k=>k==='b1'||k==='b2';
+const stName=(k,on)=>isBl(k)?(on?'Выпал':'Не выпал'):(on?'Горит':'Не горит');
+
+/* =====================================================================
+   ЛР 1. Понижение давления масла на смазку ТГ («2 из 2», реле давления)
+   ===================================================================== */
+const pcat=P=>P>=0.95?'norm':P>0.3005?'gt':P>=0.25?'eq':'lt';
+const L1CTRL=[
+  {k:'P',t:'Манометр',wide:true,o:[['norm','Р нормально'],['gt','Р больше уставки'],['eq','Р равно уставке'],['lt','Р меньше уставки']]},
+  {k:'bl',t:'Блинкер',wide:true,o:[['b3','Выпал через 3 сек'],['b9','Выпал через 9 сек'],['no','Не выпал']]},
+  {k:'L1',t:'Л1',o:[['on','Горит'],['off','Не горит']]},
+  {k:'L2',t:'Л2',o:[['on','Горит'],['off','Не горит']]},
+  {k:'sk',t:'СК',o:[['open','Открыт'],['closed','Закрыт']]}
+];
+const markText=(ctrl,m)=>ctrl.map(g=>{const o=g.o.find(x=>x[0]===m[g.k]);return o?(g.k==='P'||g.k==='bl'?o[1]:`${g.t} – ${o[1]}`):`${g.t} – не отмечено`;});
+const c1={
+  sig:['Накладка снята',S=>S.nak==='sig'],
+  work:['Накладка в положении «Работа»',S=>S.nak==='work'],
+  norm:['Давление нормальное (1,0)',S=>pcat(S.P)==='norm'],
+  eq:['Давление равно уставке (закрыть В2 на 0,3)',S=>pcat(S.P)==='eq'],
+  lt:['Давление ниже уставки (около 0,2)',S=>pcat(S.P)==='lt'],
+  nobl:['Блинкер не выпал (взведён)',S=>!S.bl],
+  bl:['Блинкер выпал',S=>S.bl],
+  skc:['СК закрыт',S=>!S.sk],
+  sko:['СК открыт',S=>S.sk],
+  ff:['Фишки Ф1 и Ф2 надеты',S=>S.f1&&S.f2],
+  f2off:['Фишка Ф2 снята, Ф1 надета',S=>S.f1&&!S.f2],
+  f1off:['Фишка Ф1 снята, Ф2 надета',S=>!S.f1&&S.f2],
+  blr:['Блинкер взведён перед опробованием на отключение',(S,c)=>!!c.blReset],
+  trip:['СК закрыт действием защиты',(S,c)=>!!c.skTripped]
+};
+const LAB1={
+  id:'l1',tab:'ЛР 1',tabSub:'давление масла',kind:'stage',
+  task:'Опробование ТЗ «Понижение давления масла на смазку ТГ»',
+  init:()=>({v1:true,v2:false,f1:true,f2:true,nak:'work',bl:false,sk:false,P:1,aT:0,xT:0,sig:{}}),
+  ctrl:L1CTRL,
+  svg(){
+    let s='';
+    const gx=150,gy=104,gr=56;
+    const ang=P=>(225-135*P)*Math.PI/180;
+    const pt=(P,r)=>[gx+r*Math.cos(ang(P)),gy-r*Math.sin(ang(P))];
+    s+=PIPE(`${gx},${gy+gr} ${gx},255`)+VALVE('gv',gx,186,true,'Вентиль манометра');
+    s+=`<circle cx="${gx}" cy="${gy}" r="${gr}" class="paper"/>`;
+    [[0,'0'],[0.3,'0,3'],[1,'1,0']].forEach(([P,l])=>{const a=pt(P,gr-12),b=pt(P,gr+2),c=pt(P,gr+20);s+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--ink)" stroke-width="3"/>`+T(c[0],c[1]+5,l,'lbl');});
+    s+=`<line id="g-needle" class="needle" x1="${gx}" y1="${gy}" x2="${gx}" y2="${gy-gr+10}"/><circle cx="${gx}" cy="${gy}" r="4" fill="var(--ink)"/>`;
+    s+=T(gx+gr+22,gy+5,'','read',`id="g-read" text-anchor="start"`);
+    s+=`<line x1="38" y1="196" x2="38" y2="330" class="mag"/>`+T(24,263,'магистраль','lbl','transform="rotate(-90 24 263)"');
+    s+=PIPE('38,255 255,255')+PIPE('195,255 195,486')+PIPE('195,345 255,345')+`<polygon points="195,498 189,486 201,486" fill="var(--pipe)"/>`;
+    s+=VALVE('v1',95,255,false,'Вентиль В1')+T(95,286,'В1','nm');
+    s+=VALVE('sv1',228,255,false,'Вентиль перед датчиком Д1')+VALVE('sv2',228,345,false,'Вентиль перед датчиком Д2');
+    s+=VALVE('v2',195,446,true,'Вентиль В2')+T(214,452,'В2','nm','text-anchor="start"');
+    const sensor=(i,y)=>HIT(`f${i}`,`Фишка датчика Д${i}`,`<rect id="f${i}-box" x="255" y="${y-15}" width="38" height="30" class="sensor"/>`+T(274,y+5,`Д${i}`,'blbl')+`<circle id="f${i}-plug" cx="300" cy="${y}" r="5.5" class="plug"/>`)+T(312,y-20,`Ф${i}`,'nm');
+    s+=sensor(1,255)+sensor(2,345);
+    // логика
+    s+=W('306,255 370,255','D1')+DOT(335,255,'D1')+W('335,255 335,400 366.5,400','D1')+W('335,330 370,330','D1')+DOT(335,330,'D1');
+    s+=W('306,345 348,345','D2')+DOT(348,345,'D2')+W('370,272 348,272 348,430 370,430','D2')+W('348,360 366.5,360','D2')+DOT(348,360,'D2');
+    s+=T(328,248,'а','lbl')+T(357,340,'б','lbl');
+    s+=GATE(370,236,25,46,'&')+GATE(370,320,25,50,'&',[360])+GATE(370,390,25,50,'&',[400]);
+    s+=W('395,259 410,259','a')+BOX(410,247,38,24,'3 с')+W('448,259 485,259','p')+DOT(465,259,'p');
+    s+=NAK('nak',485,243,40,32,'Н','Накладка');
+    s+=W('525,259 585,259','o');
+    s+=HIT('sk','Стопорный клапан',R(585,242,40,34,'paper')+T(605,238,'СК','nm')+`<polygon id="sk-p" class="valve closed" points="596,252 614,266 614,252 596,266"/>`);
+    s+=W('625,259 650,259','o')+`<polygon class="cvd" points="650,222 708,190 708,328 650,296"/>`+T(679,264,'ЦВД','lbl');
+    s+=W('465,259 465,290','p')+BLK('bl',450,290,30,28,'Б','Блинкер')+W('480,304 500,304','bl');
+    s+=GATE(500,292,20,44,'1')+W('520,314 542,314','L1')+LAMP('lp-L1',555,314,'red')+T(555,292,'Л1','nm')+T(574,319,'↓Pсм','desc');
+    s+=W('395,345 410,345','x1')+W('395,415 410,415','x2')+GATE(410,335,20,100,'1');
+    s+=W('430,385 500,385','x')+DOT(488,385,'x')+W('488,385 488,325 500,325','x');
+    s+=GATE(500,365,20,44,'1')+W('520,387 535,387','x')+BOX(535,375,38,24,'2 с')+W('573,387 592,387','L2')+LAMP('lp-L2',605,387,'yel')+T(605,365,'Л2','nm');
+    s+=T(626,379,'Сработал','desc')+T(626,395,'1 из 2-х','desc')+T(626,411,'датчиков','desc');
+    // легенда
+    s+=`<polygon class="valve closed" points="36,519 54,533 54,519 36,533"/>`+T(62,531,'Вентиль закрыт','desc');
+    s+=`<polygon class="valve open" points="36,545 54,559 54,545 36,559"/>`+T(62,557,'Вентиль открыт','desc');
+    s+=R(200,518,22,16,'sensor')+T(230,531,'Фишка надета','desc')+R(200,544,22,16,'sensor off')+T(230,557,'Фишка снята','desc');
+    return `<svg viewBox="0 0 760 575" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схема защиты по понижению давления масла">${s}</svg>`;
+  },
+  step(S,dt,ses,sys){
+    if(S.v1&&!S.v2) S.P=Math.min(1,S.P+0.3*dt);
+    else if(!S.v1&&S.v2){const r=S.P>0.45?0.16:0.035;S.P=Math.max(0,S.P-r*dt);}
+    else if(S.v1&&S.v2) S.P+=(0.6-S.P)*Math.min(1,dt*0.8);
+    const trip=S.P<=0.3005;
+    const D1=S.f1&&trip,D2=S.f2&&trip,a=D1&&D2,x=D1!==D2;
+    S.aT=a?S.aT+dt:0; const p=S.aT>=3;
+    if(p&&!S.bl) S.bl=true;
+    if(p&&S.nak==='work'&&S.sk){S.sk=false;if(ses.stage)ses.ctx.skTripped=true;sys('СК – закрыт защитой');}
+    S.xT=x?S.xT+dt:0;
+    S.sig={D1,D2,a,p,o:p&&S.nak==='work',x1:D1&&!D2,x2:!D1&&D2,x,bl:S.bl,L1:S.bl||x,L2:S.xT>=2};
+  },
+  render(S,train){
+    const ang=(225-135*S.P)*Math.PI/180, n=$('#g-needle');
+    n.setAttribute('x2',150+46*Math.cos(ang)); n.setAttribute('y2',104-46*Math.sin(ang));
+    $('#g-read').textContent=train?`P = ${S.P.toFixed(2).replace('.',',')}`:'';
+    $('#v1-p').setAttribute('class','valve '+(S.v1?'open':'closed'));
+    $('#v2-p').setAttribute('class','valve '+(S.v2?'open':'closed'));
+    [1,2].forEach(i=>{const on=S['f'+i];$(`#f${i}-box`).setAttribute('class','sensor'+(on?'':' off'));const pl=$(`#f${i}-plug`);pl.setAttribute('class','plug'+(on?'':' off'));pl.setAttribute('cx',on?300:311);});
+    setNak('nak',S.nak==='work','Работа','Снята');
+    $('#bl-r').setAttribute('class','blk'+(S.bl?' down':''));
+    $('#sk-p').setAttribute('class','valve '+(S.sk?'open':'closed'));
+    lit('lp-L1',S.sig.L1); lit('lp-L2',S.sig.L2);
+  },
+  act(a,S,ses){
+    switch(a){
+      case 'v1': S.v1=!S.v1; return {log:`В1 – ${S.v1?'открыт':'закрыт'}`};
+      case 'v2': S.v2=!S.v2; return {log:`В2 – ${S.v2?'открыт':'закрыт'}`};
+      case 'f1': case 'f2': {const k=a; S[k]=!S[k]; return {log:`Ф${a[1]} – ${S[k]?'надета':'снята'}`};}
+      case 'nak': S.nak=S.nak==='work'?'sig':'work'; return {log:`Накладка – ${S.nak==='work'?'работа':'снята'}`};
+      case 'bl': if(S.bl){S.bl=false; if(ses.stage) ses.ctx.blReset=true; return {log:'Блинкер – взведён'};} return {log:'Блинкер – нажат (не выпадал)'};
+      case 'gv': case 'sv1': case 'sv2': return {err:`${a==='gv'?'Вентиль манометра':'Вентиль перед датчиком Д'+a.slice(-1)} всегда открыт и в опробовании не участвует. По заданию управляются только вентили В1 и В2.`};
+      case 'sk': if(!S.sk){S.sk=true; return {log:'СК – открыт'};} return {err:'Стопорный клапан закрывается только действием защиты. Открыть его можно, закрыть вручную нельзя.'};
+    }
+    return {};
+  },
+  actual:S=>({P:pcat(S.P),bl:S.bl?'b3':'no',L1:S.sig.L1?'on':'off',L2:S.sig.L2?'on':'off',sk:S.sk?'open':'closed'}),
+  stages:[
+    {id:'v',n:'Визуальный контроль и подготовка к опробованию',gm:[],
+     chk:[c1.sig,c1.norm,c1.nobl,c1.skc,c1.ff],exp:{P:'norm',bl:'no',L1:'off',L2:'off',sk:'closed'},
+     h:'Снимите накладку Н (нажмите на неё). Больше ничего не трогайте: давление в норме, СК закрыт, блинкер взведён.'},
+    {id:'d1z',n:'Опробование 1-го датчика (замыкание)',gm:[[['v'],VMSG]],
+     chk:[c1.f2off,c1.eq,c1.nobl,c1.skc,c1.sig],exp:{P:'eq',bl:'no',L1:'on',L2:'on',sk:'closed'},
+     h:'Снимите фишку датчика Д2 (нажмите на Д2). Закройте В1, откройте В2 и закройте его, как только давление дойдёт до уставки 0,3. Подождите 2 с, пока загорится Л2.'},
+    {id:'d1r',n:'Опр. 1-го датчика (проверка размыкания контактов)',gm:[[['v'],VMSG],[['d1z'],'Проверка размыкания контактов 1-го датчика до проверки их замыкания!']],
+     chk:[c1.f2off,c1.norm,c1.nobl,c1.skc],exp:{P:'norm',bl:'no',L1:'off',L2:'off',sk:'closed'},
+     h:'Откройте В1, дождитесь давления 1,0 и закройте В1. Лампы должны погаснуть.'},
+    {id:'d2z',n:'Опробование 2-го датчика (замыкание)',gm:[[['v'],VMSG]],
+     chk:[c1.f1off,c1.eq,c1.nobl,c1.skc,c1.sig],exp:{P:'eq',bl:'no',L1:'on',L2:'on',sk:'closed'},
+     h:'Наденьте фишку Д2, снимите фишку Д1. Откройте В2 и закройте его на 0,3. Подождите 2 с.'},
+    {id:'d2r',n:'Опр. 2-го датчика (проверка размыкания контактов)',gm:[[['v'],VMSG],[['d2z'],'Проверка размыкания контактов 2-го датчика до проверки их замыкания!']],
+     chk:[c1.f1off,c1.norm,c1.nobl,c1.skc],exp:{P:'norm',bl:'no',L1:'off',L2:'off',sk:'closed'},
+     h:'Откройте В1 до 1,0 и закройте его.'},
+    {id:'sig',n:'Опробование защиты НА СИГНАЛ',gm:[[['v'],VMSG],[['d1z','d1r','d2z','d2r'],'Выбор опробования на Сигнал без проверки исправности датчиков!']],
+     chk:[c1.ff,c1.lt,c1.bl,c1.sko,c1.sig],exp:{P:'lt',bl:'b3',L1:'on',L2:'off',sk:'open'},
+     h:'Наденьте фишку Д1 (обе фишки надеты). Откройте СК. Откройте В2 и закройте, когда давление опустится ниже уставки (около 0,2). Через 3 с выпадет блинкер, а СК останется открытым, потому что накладка снята.'},
+    {id:'otk',n:'Восстановление схемы и опр. защиты НА ОТКЛЮЧЕНИЕ',gm:[[['v'],VMSG],[['d1z','d1r','d2z','d2r'],'Выбор опробования без проверки исправности датчиков!'],[['sig'],'Опробование НА ОТКЛЮЧЕНИЕ без опробования НА СИГНАЛ!']],
+     chk:[c1.blr,c1.work,c1.lt,c1.bl,c1.skc,c1.trip],exp:{P:'lt',bl:'b3',L1:'on',L2:'off',sk:'closed'},
+     h:'Откройте В1 до 1,0 и закройте. Взведите блинкер. Поставьте накладку в «Работа». Откройте В2, опустите давление ниже 0,3 и закройте В2. Через 3 с выпадет блинкер и закроется СК.'},
+    {id:'end',n:'Окончание опробования',gm:[[['v'],VMSG],[['d1z','d1r','d2z','d2r','sig','otk'],'Окончание опробования до выполнения всех этапов!']],
+     chk:[c1.norm,c1.nobl,c1.ff,c1.work,c1.skc],exp:{P:'norm',bl:'no',L1:'off',L2:'off',sk:'closed'},
+     h:'Откройте В1 до 1,0 и закройте. Взведите блинкер. Фишки и накладку не трогайте: схема должна остаться в рабочем состоянии.'}
+  ]
+};
+
+/* =====================================================================
+   ЛР 2 и ЛР 3: защиты на вторичных приборах, две накладки, ввод защиты
+   ===================================================================== */
+function makeLevelLab(c){
+  const sx=(x,v)=>x+24+(v-c.min)/(c.max-c.min)*102;
+  const fmt=v=>c.signed&&v>0?'+'+v:String(v);
+  const K=S=>({M1:!S.on1&&S.v1<=c.blue,B1:!S.on1&&S.v1>=c.red,M2:!S.on2&&S.v2<=c.blue,B2:!S.on2&&S.v2>=c.red});
+  const anyK=k=>k.M1||k.B1||k.M2||k.B2;
+  const L3=c.kind==='l3';
+
+  function DEV(i,x,y0){
+    let s='';
+    s+=R(x+8,y0-48,52,36,'dash')+T(x+34,y0-34,'М','lbl')+R(x+82,y0-48,52,36,'dash')+T(x+108,y0-34,'Б','lbl');
+    s+=`<line x1="${x+16}" y1="${y0-22}" x2="${x+16}" y2="${y0}" stroke="var(--ink)" stroke-width="2"/><line x1="${x+90}" y1="${y0-22}" x2="${x+90}" y2="${y0}" stroke="var(--ink)" stroke-width="2"/>`;
+    s+=`<line id="c${i}M" class="blade" x1="${x+16}" y1="${y0-22}" x2="${x+49}" y2="${y0-33}"/><line id="c${i}B" class="blade" x1="${x+90}" y1="${y0-22}" x2="${x+123}" y2="${y0-33}"/>`;
+    s+=`<circle cx="${x+52}" cy="${y0-22}" r="2.5" class="term"/><circle cx="${x+126}" cy="${y0-22}" r="2.5" class="term"/>`;
+    s+=R(x,y0,150,140,'panel')+R(x+6,y0+6,138,46,'paper');
+    s+=`<line x1="${x+12}" y1="${y0+44}" x2="${x+140}" y2="${y0+44}" stroke="var(--ink)" stroke-width="1.5"/>`;
+    c.ticks.forEach(([v,big])=>{const X=sx(x,v);s+=`<line x1="${X}" y1="${y0+(big?36:39)}" x2="${X}" y2="${y0+44}" stroke="var(--ink)" stroke-width="1.5"/>`+T(X,y0+(big?24:34),fmt(v),big?'small b':'small');});
+    if(c.unit) s+=T(x+19,y0+50,c.unit,'small');
+    const tri=(v,cls)=>{const X=sx(x,v);return `<polygon class="${cls}" points="${X-5},${y0+6} ${X+5},${y0+6} ${X},${y0+14}"/>`};
+    s+=tri(c.blue,'blu')+tri(c.red,'red');
+    s+=`<g id="d${i}-n" transform="translate(${sx(x,c.norm)} 0)"><polygon class="ylw" points="0,${y0+36} -5,${y0+50} 5,${y0+50}"/></g>`;
+    s+=R(x+8,y0+59,66,17,'paper')+T(x+41,y0+72,`Прибор ${i}`,'small-i');
+    s+=`<circle id="d${i}-l" cx="${x+20}" cy="${y0+100}" r="7" class="l220 on"/>`+T(x+20,y0+126,'~220','small');
+    s+=HIT(`t${i}`,`Тумблер Т${i}, питание прибора ${i}`,R(x+36,y0+86,34,32,'tog')+`<line id="d${i}-lev" x1="${x+47}" y1="${y0+110}" x2="${x+47}" y2="${y0+92}" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>`+T(x+60,y0+107,`Т${i}`,'togl'));
+    s+=HIT(`d${i}`,`Шкив двигателя прибора ${i}: стрелка влево`,R(x+78,y0+84,30,24,'kbtn')+`<polygon class="ktri" points="${x+86},${y0+96} ${x+99},${y0+89} ${x+99},${y0+103}"/>`);
+    s+=HIT(`u${i}`,`Шкив двигателя прибора ${i}: стрелка вправо`,R(x+112,y0+84,30,24,'kbtn')+`<polygon class="ktri" points="${x+134},${y0+96} ${x+121},${y0+89} ${x+121},${y0+103}"/>`);
+    s+=T(x+110,y0+121,'шкив','small')+T(x+110,y0+132,'двигателя','small');
+    return s;
+  }
+
+  function svg(){
+    let s='';
+    s+=DEV(1,30,120)+DEV(2,30,345);
+    // выходы контактов
+    s+=W('82,98 100,98 100,62 208,62 208,440 250,440','M1')+W('208,340 250,340','M1')+DOT(208,340,'M1')+W('208,390 246.5,390','M1')+DOT(208,390,'M1');
+    s+=W('82,323 100,323 100,287 224,287 224,460 250,460','M2')+W('224,360 246.5,360','M2')+DOT(224,360,'M2')+W('224,410 250,410','M2')+DOT(224,410,'M2');
+    if(!L3){
+      s+=W('156,98 200,98','B1')+DOT(200,98,'B1')+W('250,90 200,90 200,190 246.5,190','B1')+W('200,140 250,140','B1')+DOT(200,140,'B1');
+      s+=W('156,323 216,323 216,110 250,110','B2')+W('216,160 246.5,160','B2')+DOT(216,160,'B2')+W('216,210 250,210','B2')+DOT(216,210,'B2');
+      s+=GATE(250,80,25,40,'&')+GATE(250,130,25,40,'&',[160])+GATE(250,180,25,40,'&',[190]);
+      s+=W('275,150 290,150','xB1')+W('275,200 290,200','xB2')+GATE(290,135,22,80,'1');
+      s+=W('312,175 445,175','xB')+DOT(420,175,'xB')+W('420,175 420,265 445,265','xB');
+      s+=W('275,100 345,100','andB')+GATE(345,88,25,36,'&')+W('330,112 345,112','T');
+      s+=W('370,106 400,106','pB')+DOT(385,106,'pB')+W('385,106 385,153 392,153','pB');
+      s+=BLK('b1',392,140,36,26,'1Б','Блинкер 1Б')+W('428,153 445,153','bl1')+GATE(445,140,20,50,'1')+W('465,165 532,165','L1');
+      s+=W('437,280 445,280');
+    }else{
+      s+=W('156,98 250,98','B1')+W('156,323 216,323 216,114 250,114','B2')+GATE(250,88,25,36,'1');
+      s+=W('275,106 400,106','orB')+DOT(385,106,'orB')+W('385,106 385,165 392,165','orB');
+      s+=BLK('b1',392,152,36,26,'1Б','Блинкер 1Б')+W('428,165 532,165','bl1');
+      s+=W('437,265 445,265')+W('437,280 445,280');
+    }
+    s+=NAK('n1',400,90,40,32,'1Н','Накладка 1Н');
+    s+=W('440,106 645,106 645,410 665,410','o1');
+    // понижение
+    s+=GATE(250,330,25,40,'&',[360])+GATE(250,380,25,40,'&',[390])+GATE(250,430,25,40,'&');
+    s+=W('275,350 290,350','xM1')+W('275,400 290,400','xM2')+GATE(290,335,22,80,'1');
+    s+=W('312,375 445,375','xM')+DOT(420,375,'xM')+W('420,375 420,295 445,295','xM');
+    s+=GATE(445,255,20,50,'1')+W('465,280 478,280','xany')+BOX(478,268,36,24,'2 с')+W('514,280 532,280','L');
+    s+=W('275,450 285,450 285,442 345,442','andM')+GATE(345,432,25,36,'&')+W('330,458 345,458','T');
+    s+=W('370,450 400,450','pM')+DOT(385,450,'pM')+W('385,450 385,398 392,398','pM');
+    s+=BLK('b2',392,385,36,26,'2Б','Блинкер 2Б')+W('428,398 445,398','bl2')+GATE(445,362,20,48,'1')+W('465,386 532,386','L2');
+    s+=NAK('n2',400,434,40,32,'2Н','Накладка 2Н');
+    s+=W('440,450 665,450','o2');
+    // выход на останов
+    s+=GATE(665,395,20,70,'1')+W('685,430 710,430','rok')+DOT(697,430,'rok')+BOX(710,418,45,24,'РОК')+W('755,430 792,430','rok')+DOT(775,430,'rok');
+    s+=W('697,430 697,467 710,467','rok')+BOX(710,455,45,24,'РЗП')+W('755,467 793,467','rok')+ARROW(801,467,'r','rok');
+    s+=W('775,430 775,375 835,375','rok')+ARROW(843,375,'r','rok');
+    s+=LAMP('lp-L3',805,430,'red')+T(805,409,'Л3','nm')+T(805,462,'Останов','lbl')+T(805,478,'котла','lbl');
+    // ввод защиты, триггер, 20 с
+    s+=W('775,430 775,566 195,566 195,550','rok')+BOX(175,530,40,20,'20 с')+W('215,540 230,540','rst');
+    s+=R(230,495,32,57,'gate')+`<line x1="246" y1="495" x2="246" y2="552" stroke="var(--ink)" stroke-width="1.5"/>`+T(238,512,'S','glbl')+T(238,546,'R','glbl')+T(254,512,'T','glbl');
+    if(!L3){
+      s+=R(30,488,66,62,'paper')+T(42,504,'В','lbl')+T(63,500,'Н','lbl')+T(84,504,'В','lbl')+`<g id="kvz-key"><rect x="59" y="508" width="8" height="34" fill="var(--ink)"/><rect x="55" y="520" width="16" height="10" fill="var(--ink)"/></g>`+T(63,568,'КВЗ','nm');
+      s+=HIT('kvzL','Ключ КВЗ: повернуть влево, ввод защиты',R(30,488,33,62,'hitbox'))+HIT('kvzR','Ключ КВЗ: повернуть вправо, ввод защиты',R(63,488,33,62,'hitbox'));
+      s+=W('96,505 230,505','S');
+      s+=W('262,505 330,505','T')+DOT(330,505,'T')+W('330,112 330,512 532,512','T')+DOT(330,458,'T');
+    }else{
+      s+=HIT('start','Кнопка «Начало растопки»',R(30,488,112,48,'btnbox')+T(86,508,'Начало','btnbox-t')+T(86,527,'растопки','btnbox-t'));
+      s+=W('142,505 230,505','S');
+      s+=W('262,505 330,505','T')+DOT(330,505,'T')+W('330,458 330,512 532,512','T');
+    }
+    s+=LAMP('lp-L1',545,165,'red')+T(545,145,'Л1','nm')+T(566,170,c.up,'desc');
+    s+=LAMP('lp-L',545,280,'yel')+T(545,260,'Л','nm')+T(566,272,'Сработал','desc')+T(566,288,'1 из 2-х','desc')+T(566,304,'датчиков','desc');
+    s+=LAMP('lp-L2',545,386,'red')+T(545,366,'Л2','nm')+T(566,391,c.down,'desc');
+    s+=LAMP('lp-LS',545,512,'yel')+T(545,544,'ЛС','nm')+T(566,507,c.lsA,'desc')+T(566,523,'введена','desc');
+    return `<svg viewBox="0 0 860 580" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схема защиты">${s}</svg>`;
+  }
+
+  function step(S,dt,ses,sys){
+    const k=K(S);
+    const xM1=k.M1&&!k.M2,xM2=!k.M1&&k.M2,xM=xM1||xM2,andM=k.M1&&k.M2,pM=andM&&S.T;
+    let xB1=false,xB2=false,xB=false,andB=false,pB=false,orB=false;
+    if(L3){orB=k.B1||k.B2;pB=orB;}else{xB1=k.B1&&!k.B2;xB2=!k.B1&&k.B2;xB=xB1||xB2;andB=k.B1&&k.B2;pB=andB&&S.T;}
+    if(pB) S.bl1=true;
+    if(pM) S.bl2=true;
+    const o1=pB&&S.n1==='work',o2=pM&&S.n2==='work',rok=o1||o2;
+    S.rokT=rok?S.rokT+dt:0;
+    if(S.rokT>=20){if(S.T){S.T=false;sys('Защита выведена через 20 с после срабатывания');}S.rokT=0;}
+    const xany=xB||xM; S.xT=xany?S.xT+dt:0;
+    S.sig={...k,xB1,xB2,xB,andB,orB,pB,xM1,xM2,xM,andM,pM,T:S.T,o1,o2,rok,rst:false,S:S.kvzT>0,
+      bl1:S.bl1,bl2:S.bl2,L1:L3?S.bl1:(S.bl1||xB),L2:S.bl2||xM,xany,L:S.xT>=2,LS:S.T};
+    if(S.kvzT>0) S.kvzT=Math.max(0,S.kvzT-dt);
+  }
+
+  function render(S){
+    [1,2].forEach(i=>{
+      const on=S['on'+i], v=S['v'+i], x=30, y0=i===1?120:345, k=K(S);
+      $(`#d${i}-n`).setAttribute('transform',`translate(${sx(x,v)} 0)`);
+      $(`#d${i}-l`).setAttribute('class','l220'+(on?' on':''));
+      const lev=$(`#d${i}-lev`); lev.setAttribute('y2',on?y0+92:y0+112); lev.setAttribute('x2',on?x+47:x+42);
+      const bm=$(`#c${i}M`),bb=$(`#c${i}B`);
+      bm.setAttribute('x2',k['M'+i]?x+52:x+49); bm.setAttribute('y2',k['M'+i]?y0-22:y0-33);
+      bb.setAttribute('x2',k['B'+i]?x+126:x+123); bb.setAttribute('y2',k['B'+i]?y0-22:y0-33);
+    });
+    setNak('n1',S.n1==='work','ОТКЛ.','СИГНАЛ'); setNak('n2',S.n2==='work','ОТКЛ.','СИГНАЛ');
+    $('#b1-r').setAttribute('class','blk'+(S.bl1?' down':'')); $('#b2-r').setAttribute('class','blk'+(S.bl2?' down':''));
+    lit('lp-L1',S.sig.L1); lit('lp-L2',S.sig.L2); lit('lp-L',S.sig.L); lit('lp-L3',S.sig.rok); lit('lp-LS',S.T);
+    const key=$('#kvz-key'); if(key){if(S.kvzT>0)key.setAttribute('transform',`rotate(${45*(S.kvzDir||-1)} 63 525)`);else key.removeAttribute('transform');}
+  }
+
+  function act(a,S,ses){
+    const i=a.slice(-1), t=a[0];
+    if(t==='t'){const on=!S['on'+i];S['on'+i]=on;if(on)S['v'+i]=c.norm;return {log:`Прибор ${i} – ${on?'включён':'отключён'} (Т${i})`};}
+    if(t==='u'||t==='d'){
+      if(S['on'+i]) return {err:`Прибор ${i} включён, его стрелку двигать нельзя. Сначала отключите прибор тумблером Т${i}.`};
+      const before=K(S);
+      S['v'+i]=clamp(S['v'+i]+(t==='u'?c.step:-c.step),c.min,c.max);
+      const after=K(S); const out={log:`Прибор ${i}: стрелка на ${fmt(S['v'+i])}`,merge:'needle'+i};
+      if(ses.stage&&ses.stage.blCheck&&!ses.ctx.blChecked&&anyK(after)&&!anyK(before)){
+        ses.ctx.blChecked=true;
+        if(S.bl1||S.bl2){const w=S.bl1&&S.bl2?'Блинкеры 1Б и 2Б не были подняты':`Блинкер ${S.bl1?'1Б':'2Б'} не был поднят`;out.gross=`${w} перед опробованием на останов!`;}
+      }
+      return out;
+    }
+    if(t==='n'){S['n'+i]=S['n'+i]==='work'?'sig':'work';return {log:`Накладка ${i}Н – ${S['n'+i]==='work'?'установлена («Отключение»)':'снята («Сигнал»)'}`};}
+    if(t==='b'){if(S['bl'+i]){S['bl'+i]=false;return {log:`Блинкер ${i}Б – взведён`};}return {log:`Блинкер ${i}Б – нажат (не выпадал)`};}
+    if(a==='kvzL'||a==='kvzR'){S.T=true;S.kvzT=0.6;S.kvzDir=a==='kvzL'?-1:1;return {log:`КВЗ – ввод защиты (ключ ${a==='kvzL'?'влево':'вправо'})`};}
+    if(a==='start'){S.T=true;S.kvzT=0.3;return {log:'Начало растопки – нажата'};}
+    return {};
+  }
+
+  const actual=S=>({p1:S.on1,p2:S.on2,b1:S.bl1,b2:S.bl2,L:S.sig.L,L1:S.sig.L1,L2:S.sig.L2,L3:S.sig.rok,LS:S.T});
+
+  /* условия подэтапов */
+  const only=(q,txt)=>[txt,S=>{const k=K(S);return ['B1','M1','B2','M2'].every(z=>k[z]===(z===q))}];
+  const C={
+    off:['Оба прибора отключены тумблерами Т1 и Т2',S=>!S.on1&&!S.on2],
+    sig:['Накладки 1Н и 2Н сняты («Сигнал»)',S=>S.n1==='sig'&&S.n2==='sig'],
+    open:[`Стрелки обоих приборов в норме (${fmt(c.norm)}), контакты разомкнуты`,S=>{const k=K(S);return !anyK(k)}],
+    MM:[`Стрелки обоих приборов на синей уставке (${fmt(c.blue)}), контакты М1 и М2 замкнуты`,S=>{const k=K(S);return k.M1&&k.M2}],
+    BB:[`Стрелки обоих приборов на красной уставке (${fmt(c.red)}), контакты Б1 и Б2 замкнуты`,S=>{const k=K(S);return k.B1&&k.B2}],
+    oneB:[`Стрелка одного прибора на красной уставке (${fmt(c.red)})`,S=>{const k=K(S);return k.B1!==k.B2&&!k.M1&&!k.M2}],
+    T:['Защита введена (горит ЛС)',S=>S.T],
+    nT:['Защита не введена или уже выведена (ЛС не горит)',S=>!S.T],
+    n2w:['Накладка 2Н установлена («Отключение»)',S=>S.n2==='work'],
+    n1w:['Накладка 1Н установлена («Отключение»)',S=>S.n1==='work'],
+    n2s:['Накладка 2Н снята («Сигнал»)',S=>S.n2==='sig'],
+    on:['Оба прибора включены тумблерами',S=>S.on1&&S.on2],
+    work:['Обе накладки установлены («Отключение»)',S=>S.n1==='work'&&S.n2==='work']
+  };
+  const red=fmt(c.red),blue=fmt(c.blue),norm=fmt(c.norm);
+  const devStage=(id,n,q,qn,lamps,hz,hr)=>({id,n,gm:[[['v'],VMSG]],subs:[
+    {n:`Замыкание контакта ${qn}`,chk:[only(q,`Замкнут только контакт ${qn}`)],on:lamps,h:hz},
+    {n:`Размыкание контакта ${qn}`,chk:[C.open],on:[],h:hr}]});
+  const DEVS=['b1','m1','b2','m2'];
+  const DEVMSG='Выбор опробования защиты без проверки исправности приборов!';
+  const zB=L3?['b1','L1']:['L','L1'];
+  const hB=(i)=>L3?`Кнопкой ▶ «шкив двигателя» прибора ${i} доведите стрелку до красной уставки (${red}). Защита по повышению работает по схеме «1 из 2» без ввода, поэтому сразу выпадет блинкер 1Б и загорится Л1.`
+                  :`Кнопкой ▶ «шкив двигателя» прибора ${i} доведите стрелку до красной уставки (${red}). Подождите 2 с, пока загорится Л «Сработал 1 из 2-х датчиков».`;
+  const hBr=(i)=>L3?`Верните стрелку прибора ${i} к ${norm} и взведите блинкер 1Б (нажмите на него).`:`Верните стрелку прибора ${i} в ${norm}.`;
+  const hM=(i)=>`Кнопкой ◀ доведите стрелку прибора ${i} до синей уставки (${blue}). Подождите 2 с, пока загорится Л.`;
+  const hMr=(i)=>`Верните стрелку прибора ${i} в ${norm}.`;
+
+  const stages=[
+    {id:'v',n:'Визуальный контроль и подготовка к опробованию',gm:[],subs:[
+      {n:'Подготовка схемы',chk:[C.sig,C.off,C.open],on:[],h:'Снимите накладки 1Н и 2Н (положение «Сигнал») и отключите оба прибора тумблерами Т1 и Т2. Лампы ~220 погаснут.'}]},
+    devStage('b1','Опробование 1-го прибора на «Больше»','B1','Б1',zB,hB(1),hBr(1)),
+    devStage('m1','Опробование 1-го прибора на «Меньше»','M1','М1',['L','L2'],hM(1),hMr(1)),
+    devStage('b2','Опробование 2-го прибора на «Больше»','B2','Б2',zB,hB(2),hBr(2)),
+    devStage('m2','Опробование 2-го прибора на «Меньше»','M2','М2',['L','L2'],hM(2),hMr(2))
+  ];
+  if(!L3){
+    stages.push(
+      {id:'sp',n:'Опробование «на сигнал» защиты по понижению Lб',gm:[[['v'],VMSG],[DEVS,DEVMSG]],subs:[
+        {n:'Замыкание контактов приборов',chk:[C.MM,C.nT],on:[],h:`Доведите стрелки обоих приборов до синей уставки (${blue}). Защита ещё не введена, поэтому блинкер не выпадает и табло не горят.`},
+        {n:'Ввод защиты ключом КВЗ',chk:[C.MM,C.T,C.sig],on:['b2','L2','LS'],h:'Введите защиту ключом КВЗ: нажмите на левую или правую букву «В», обе стороны вводят защиту. Загорится ЛС, выпадет блинкер 2Б.'},
+        {n:'Размыкание контактов приборов',chk:[C.open,C.T],on:['LS'],h:`Верните обе стрелки в ${norm} и взведите блинкер 2Б.`}]},
+      {id:'sb',n:'Опробование «на сигнал» защиты по повышению Lб',gm:[[['v'],VMSG],[DEVS,DEVMSG],[['sp'],'Опробование по повышению Lб до опробования по понижению: защита не введена ключом КВЗ!']],subs:[
+        {n:'Замыкание контактов приборов',chk:[C.BB,C.T],on:['b1','L1','LS'],h:`Доведите стрелки обоих приборов до красной уставки (${red}). Выпадет блинкер 1Б.`},
+        {n:'Размыкание контактов приборов',chk:[C.open,C.T],on:['LS'],h:`Верните обе стрелки в ${norm} и взведите блинкер 1Б.`}]},
+      {id:'st',n:'Опробование защиты «на останов»',blCheck:true,gm:[[['v'],VMSG],[DEVS,DEVMSG],[['sp','sb'],'Выбор опробования «на останов» без опробования защит «на сигнал»!']],subs:[
+        {n:'Замыкание контактов приборов',chk:[C.n2w,C.MM,C.T],on:['b2','L2','L3','LS'],h:`Проверьте, что 1Б и 2Б взведены. Установите накладку 2Н («Отключение») и доведите обе стрелки до ${blue}. Через 20 с защита выведется сама, поэтому отметьте ответы в окне контроля заранее и нажмите «Контроль выполнен», пока горит Л3.`},
+        {n:'Защита закончила работу',chk:[C.MM,C.nT],on:['b2','L2'],h:'Дождитесь, пока через 20 с погаснут Л3 и ЛС.'},
+        {n:'Подъём блинкера',chk:[C.MM,C.nT],on:[],h:'Взведите блинкер 2Б.'},
+        {n:'Размыкание контактов приборов',chk:[C.open,C.nT],on:[],h:`Верните обе стрелки в ${norm}.`}]},
+      {id:'end',n:'Окончание опробования',gm:[[['v'],VMSG],[['b1','m1','b2','m2','sp','sb','st'],'Окончание опробования до выполнения всех этапов!']],subs:[
+        {n:'Окончание опробования',chk:[C.work,C.on,C.nT],on:['p1','p2'],h:'Установите накладку 1Н (обе накладки в «Отключение») и включите оба прибора тумблерами Т1 и Т2.'}]}
+    );
+  }else{
+    stages.push(
+      {id:'sp',n:'Опробование «на сигнал» защиты по понижению Рвз',gm:[[['v'],VMSG],[DEVS,DEVMSG]],subs:[
+        {n:'Замыкание контактов приборов',chk:[C.MM,C.nT],on:[],h:`Доведите стрелки обоих приборов до синей уставки (${blue}). Защита по понижению ещё не введена.`},
+        {n:'Ввод защиты кнопкой «Начало растопки»',chk:[C.MM,C.T,C.sig],on:['b2','L2','LS'],h:'Нажмите «Начало растопки»: защита введётся, загорится ЛС, выпадет блинкер 2Б.'},
+        {n:'Размыкание контактов приборов',chk:[C.open,C.T],on:['LS'],h:`Верните обе стрелки к ${norm} и взведите блинкер 2Б.`}]},
+      {id:'stm',n:'Опробование защиты «на останов» по понижению Рвз',blCheck:true,gm:[[['v'],VMSG],[DEVS,DEVMSG],[['sp'],'Выбор опробования «на останов» без опробования «на сигнал»!']],subs:[
+        {n:'Замыкание контактов приборов',chk:[C.n2w,C.MM,C.T],on:['b2','L2','L3','LS'],h:`Проверьте, что блинкеры взведены. Установите накладку 2Н («Отключение») и доведите обе стрелки до ${blue}. Отметьте ответы в окне контроля заранее: через 20 с защита выведется.`},
+        {n:'Защита закончила работу',chk:[C.MM,C.nT],on:['b2','L2'],h:'Дождитесь, пока погаснут Л3 и ЛС.'},
+        {n:'Подъём блинкера',chk:[C.MM,C.nT],on:[],h:'Взведите блинкер 2Б.'},
+        {n:'Размыкание контактов приборов',chk:[C.open,C.nT],on:[],h:`Верните обе стрелки к ${norm}.`}]},
+      {id:'stb',n:'Опробование защиты «на останов» по повышению Рвз',blCheck:true,gm:[[['v'],VMSG],[DEVS,DEVMSG],[['stm'],'Опробование «на останов» по повышению Рвз до опробования по понижению!']],subs:[
+        {n:'Замыкание контакта одного прибора',chk:[C.n1w,C.n2s,C.oneB],on:['b1','L1','L3'],h:`Установите накладку 1Н («Отключение»), снимите 2Н («Сигнал»). Доведите стрелку одного прибора до ${red}. Защита «1 из 2» сработает сразу.`},
+        {n:'Замыкание контактов обоих приборов',chk:[C.n1w,C.BB],on:['b1','L1','L3'],h:`Доведите до ${red} стрелку второго прибора.`},
+        {n:'Размыкание контактов приборов',chk:[C.open],on:['b1','L1'],h:`Не дожидаясь, верните обе стрелки к ${norm}. Л3 погаснет, блинкер 1Б останется выпавшим.`},
+        {n:'Подъём блинкера',chk:[C.open],on:[],h:'Взведите блинкер 1Б.'}]},
+      {id:'end',n:'Окончание опробования',gm:[[['v'],VMSG],[['b1','m1','b2','m2','sp','stm','stb'],'Окончание опробования до выполнения всех этапов!']],subs:[
+        {n:'Окончание опробования',chk:[C.work,C.on,C.nT],on:['p1','p2'],h:'Установите накладку 2Н (обе накладки в «Отключение») и включите оба прибора тумблерами.'}]}
+    );
+  }
+  return {id:c.id,tab:c.tab,tabSub:c.tabSub,kind:'sub',task:c.task,
+    init:()=>({on1:true,on2:true,v1:c.norm,v2:c.norm,n1:'work',n2:'work',bl1:false,bl2:false,T:false,xT:0,rokT:0,kvzT:0,kvzDir:-1,sig:{}}),
+    svg,step,render,act,actual,stages};
+}
+const LAB2=makeLevelLab({id:'l2',kind:'l2',tab:'ЛР 2',tabSub:'уровень в барабане',task:'Опробование ТЗ «По уровню в барабане котла»',
+  min:-200,max:200,norm:0,blue:-50,red:100,step:25,signed:true,unit:'',
+  ticks:[[-200,1],[-100,0],[0,1],[100,0],[200,1]],up:'↑Lб',down:'↓Lб',lsA:'ТЗ по Lб'});
+const LAB3=makeLevelLab({id:'l3',kind:'l3',tab:'ЛР 3',tabSub:'давление перед ВЗ',task:'Опробование ТЗ «По давлению перед задвижкой, встроенной в тракт котла (ВЗ)»',
+  min:100,max:350,norm:200,blue:125,red:300,step:25,signed:false,unit:'МПа',
+  ticks:[[100,1],[150,0],[200,1],[250,0],[300,1],[350,0]],up:'↑Pвз',down:'↓Pвз',lsA:'ТЗ по Pвз'});
+const LABS={l1:LAB1,l2:LAB2,l3:LAB3};
+
+/* ---------- общие функции отрисовки ---------- */
+function lit(id,on){const e=document.getElementById(id);if(e)e.classList.toggle('lit',!!on);}
+function setNak(id,work,wl,sl){
+  const g=GEO[id],b=$(`#${id}-bar`);if(!g||!b)return;
+  b.setAttribute('x2',work?g.x2:g.x1+3); b.setAttribute('y2',work?g.cy:g.top);
+  $(`#${id}-st`).textContent=work?wl:sl;
+}
+
+/* ---------- состояние приложения ---------- */
+const app={lab:LABS[store.get('tz.lab')]?store.get('tz.lab'):'l1',mode:store.get('tz.mode')==='exam'?'exam':'train',ses:{}};
+const train=()=>app.mode==='train';
+function newSes(id){
+  const L=LABS[id];const ids=L.stages.map(s=>s.id);
+  const sh=ids.slice();for(let i=sh.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[sh[i],sh[j]]=[sh[j],sh[i]];}
+  return {S:L.init(),elapsed:0,stage:null,sub:0,ctx:{},done:{},recs:[],cur:null,gross:0,reg:0,shuffled:sh,warn:false,marks:{},log:[],reveal:false,diff:[]};
+}
+const ses=()=>app.ses[app.lab]||(app.ses[app.lab]=newSes(app.lab));
+const lab=()=>LABS[app.lab];
+let wires=[];
+
+/* ---------- сообщения ---------- */
+function msg(kind,tag,html){const m=$('#msg');m.className='msg '+(kind||'');m.innerHTML=`<b class="tag">${esc(tag)}</b>${html}`;}
+const list=a=>`<ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+
+function addLog(text,merge){
+  const s=ses();const st=s.stage?s.stage.n:'—';
+  const last=s.log[s.log.length-1];
+  if(merge&&last&&last.merge===merge&&last.st===st){last.text=text;}else s.log.push({text,merge,st});
+  if(s.cur){const a=s.cur.actions;if(merge&&s.cur.lastMerge===merge&&a.length){a[a.length-1]=text;}else a.push(text);s.cur.lastMerge=merge||null;}
+  renderLog();
+}
+const sys=t=>{if(ses().stage)addLog(t);};
+
+/* ---------- построение интерфейса ---------- */
+function buildTabs(){
+  $('#lab-tabs').innerHTML=Object.values(LABS).map(L=>`<button type="button" data-lab="${L.id}" id="tab-${L.id}">${L.tab} <small>· ${L.tabSub}</small></button>`).join('');
+}
+function buildLab(){
+  const L=lab(),s=ses();
+  Object.keys(GEO).forEach(k=>delete GEO[k]);
+  $('#scheme').innerHTML=L.svg();
+  wires=[...document.querySelectorAll('#scheme [data-s]')];
+  $('#task-title').textContent=`${L.tab}. ${L.task}`;
+  buildCtrl();
+  $('#ctrl-actions').hidden=L.kind!=='sub';
+  document.querySelectorAll('#lab-tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lab===app.lab));
+  document.querySelectorAll('#mode-tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===app.mode));
+  refreshStage(); renderLog(); tick(0);
+  msg('', 'Как работать', L.kind==='sub'
+    ?'Выберите этап, выполните действия на схеме (тумблеры, кнопки шкива, накладки, блинкеры нажимаются). После каждого подэтапа отметьте состояние в окне контроля и нажмите «Контроль выполнен». Затем «Этап выполнен».'
+    :'Выберите этап, выполните действия на схеме (вентили, фишки датчиков, накладка, блинкер и СК нажимаются). Отметьте состояние в окне контроля и нажмите «Этап выполнен».');
+}
+function buildCtrl(){
+  const L=lab(),s=ses();let h='';
+  if(L.kind==='stage'){
+    h='<div class="cgrid">'+L.ctrl.map(g=>`<fieldset class="cell${g.wide?' wide':''}" data-k="${g.k}"><legend>${g.t}</legend><div class="opts">${g.o.map(([v,t])=>`<label class="opt"><input type="radio" name="c-${L.id}-${g.k}" id="c-${L.id}-${g.k}-${v}" value="${v}" ${s.marks[g.k]===v?'checked':''}><span>${t}</span></label>`).join('')}</div></fieldset>`).join('')+'</div>';
+  }else{
+    LAMPKEYS.forEach(k=>{if(s.marks[k]===undefined)s.marks[k]='off';});
+    h='<div class="cgrid">'+LAMPKEYS.map(k=>`<fieldset class="cell" data-k="${k}"><legend>${LAMPNAMES[k]}</legend><div class="opts">${['on','off'].map(v=>`<label class="opt"><input type="radio" name="c-${L.id}-${k}" id="c-${L.id}-${k}-${v}" value="${v}" ${s.marks[k]===v?'checked':''}><span>${stName(k,v==='on')}</span></label>`).join('')}</div></fieldset>`).join('')+'</div>';
+  }
+  $('#ctrl').innerHTML=h;
+  $('#ctrl').onchange=e=>{const f=e.target.closest('fieldset');if(f){ses().marks[f.dataset.k]=e.target.value;f.classList.remove('diff');}};
+}
+function showDiff(keys){document.querySelectorAll('#ctrl fieldset').forEach(f=>f.classList.toggle('diff',keys.includes(f.dataset.k)));}
+
+function refreshStage(){
+  const L=lab(),s=ses(),sel=$('#stage-sel');
+  const ids=train()?L.stages.map(x=>x.id):s.shuffled;
+  const opts=ids.filter(id=>!s.done[id]).map(id=>L.stages.find(x=>x.id===id));
+  sel.innerHTML=`<option value="">&lt;выберите этап для выполнения&gt;</option>`+opts.map(o=>`<option value="${o.id}">${esc(o.n)}</option>`).join('');
+  sel.value=s.stage?s.stage.id:'';
+  if(s.stage&&!opts.find(o=>o.id===s.stage.id)) sel.innerHTML+=`<option value="${s.stage.id}">${esc(s.stage.n)}</option>`;
+  sel.value=s.stage?s.stage.id:'';
+  sel.disabled=!!s.stage;
+  $('#btn-stage').disabled=!s.stage;
+  $('#btn-ctrl').disabled=!s.stage;
+  const b=$('#banner');b.textContent=s.stage?s.stage.n:'<выберите этап для выполнения>';b.className=s.stage?'':'idle';
+  let now='';
+  if(s.stage&&L.kind==='sub'){const sb=s.stage.subs[s.sub];now=sb?`Подэтап ${s.sub+1} из ${s.stage.subs.length}: ${sb.n}`:'Все подэтапы выполнены. Нажмите «Этап выполнен».';}
+  $('#stage-now').textContent=now;
+  renderHint(); renderProgress(); renderErr();
+}
+
+function renderHint(){
+  const L=lab(),s=ses(),card=$('#hint-card');
+  card.hidden=!train();
+  if(!train())return;
+  let h='';
+  if(!s.stage){
+    const next=L.stages.find(x=>!s.done[x.id]);
+    h=next?`<p class="hint-text">Следующий этап по порядку: <b>${esc(next.n)}</b>. Выберите его в списке.</p>`:'<p class="hint-text">Все этапы выполнены. Нажмите «Опробование завершено», чтобы получить протокол.</p>';
+  }else if(L.kind==='stage'){
+    const st=s.stage;
+    h=`<p class="hint-text">${esc(st.h)}</p>`;
+    h+=`<div class="row" style="margin-top:8px"><button class="btn" type="button" id="btn-reveal">${s.reveal?'Скрыть правильный контроль':'Показать правильный контроль'}</button></div>`;
+    if(s.reveal) h+=`<div class="reveal">${markText(L.ctrl,st.exp).map(esc).join('<br>')}</div>`;
+  }else{
+    const st=s.stage,sb=st.subs[s.sub];
+    h=sb?`<p class="hint-text"><b>${esc(sb.n)}.</b> ${esc(sb.h)}</p>`:'<p class="hint-text">Все подэтапы выполнены. Нажмите «Этап выполнен».</p>';
+    h+='<ul class="subs">'+st.subs.map((x,i)=>{const r=s.cur.subs[i];let m='wait',t='○';if(r.vyp){const ok=r.vyp==='+'&&r.kon==='+';m=ok?'ok':'bad';t=ok?'✓':'✗';}else if(i===s.sub){m='cur';t='▸';}return `<li><span class="mark ${m}">${t}</span><span>${esc(x.n)}</span></li>`}).join('')+'</ul>';
+    if(sb){
+      h+=`<div class="row" style="margin-top:8px"><button class="btn" type="button" id="btn-reveal">${s.reveal?'Скрыть правильный контроль':'Показать правильный контроль'}</button></div>`;
+      if(s.reveal){const on=LAMPKEYS.filter(k=>sb.on.includes(k));h+=`<div class="reveal">${on.length?on.map(k=>`${LAMPNAMES[k]} – ${stName(k,true)}`).join('<br>')+'<br>':''}<span class="muted">Остальное – не горит / не выпал.</span></div>`;}
+    }
+  }
+  $('#hint').innerHTML=h;
+  const rb=$('#btn-reveal');if(rb)rb.onclick=()=>{ses().reveal=!ses().reveal;renderHint();};
+}
+
+function stageRec(id){const s=ses();for(let i=s.recs.length-1;i>=0;i--){const r=s.recs[i];if(r.type==='stage'&&r.id===id)return r;}return null;}
+function recOk(r){return r.type==='stage'&&(r.subs?r.subs.every(x=>x.vyp==='+'&&x.kon==='+')&&!r.extra&&!r.notes.length:r.vyp&&r.kon);}
+function renderProgress(){
+  const L=lab(),s=ses();let items=[];
+  if(train()){
+    items=L.stages.map(st=>{const r=stageRec(st.id);let m='wait',t='○';if(s.stage&&s.stage.id===st.id){m='cur';t='▸';}else if(s.done[st.id]){const ok=r&&recOk(r);m=ok?'ok':'bad';t=ok?'✓':'✗';}return `<li><span class="mark ${m}">${t}</span><span>${esc(st.n)}</span></li>`;});
+  }else{
+    items=s.recs.filter(r=>r.type==='stage'&&r.closed).map(r=>{const ok=recOk(r);return `<li><span class="mark ${ok?'ok':'bad'}">${ok?'✓':'✗'}</span><span>${esc(r.n)}</span></li>`;});
+    if(s.stage) items.push(`<li><span class="mark cur">▸</span><span>${esc(s.stage.n)}</span></li>`);
+    if(!items.length) items=['<li><span class="mark wait">○</span><span class="muted">Пока ни одного этапа. В режиме экзамена этапы в списке перемешаны, как в симуляторе.</span></li>'];
+  }
+  $('#progress').innerHTML=items.join('');
+}
+function renderErr(){const s=ses(),e=$('#err');e.textContent=`${s.gross}/${s.reg}`;e.classList.toggle('has-err',s.gross+s.reg>0);}
+function renderLog(){const s=ses();$('#log').innerHTML=s.log.length?s.log.map(l=>`<li>${esc(l.text)} <span class="muted">— ${esc(l.st)}</span></li>`).join(''):'<li class="muted">Действий пока нет</li>';}
+const hms=t=>{t=Math.floor(t);const h=Math.floor(t/3600),m=Math.floor(t%3600/60),x=t%60;return [h,m,x].map(v=>String(v).padStart(2,'0')).join(':');};
+
+/* ---------- логика этапов ---------- */
+function selectStage(id){
+  const L=lab(),s=ses();if(!id||s.stage)return;
+  const st=L.stages.find(x=>x.id===id);
+  for(const [ids,m] of st.gm){
+    if(ids.some(x=>!s.done[x])){
+      s.gross++; s.recs.push({type:'gross',n:st.n,msg:m});
+      msg('bad','Грубая ошибка',esc(m)+(train()?`<br><span class="muted">Этап не начат. ${ids.length>1?'Сначала выполните: '+ids.filter(x=>!s.done[x]).map(x=>'«'+L.stages.find(y=>y.id===x).n+'»').join(', ')+'.':''}</span>`:''));
+      refreshStage();return;
+    }
+  }
+  if(st.id!=='v'&&!s.done.v){s.gross++;s.recs.push({type:'gross',n:st.n,msg:VMSG});msg('bad','Грубая ошибка',esc(VMSG));refreshStage();return;}
+  s.stage=st;s.sub=0;s.ctx={};s.warn=false;s.reveal=false;
+  s.cur={type:'stage',id:st.id,n:st.n,actions:[],notes:[],extra:0,subs:st.subs?st.subs.map(x=>({n:x.n,vyp:null,kon:null})):null};
+  s.recs.push(s.cur);
+  showDiff([]);
+  msg('', 'Этап выбран', esc(st.n)+(train()?'. Порядок действий — в подсказке ниже.':'.'));
+  refreshStage();
+}
+function failed(chk,S,ctx){return chk.filter(([t,f])=>!f(S,ctx)).map(([t])=>t);}
+function lampsMatch(act,on){return LAMPKEYS.every(k=>!!act[k]===on.includes(k));}
+
+function doControl(){
+  const L=lab(),s=ses();if(!s.stage||L.kind!=='sub')return;
+  const st=s.stage,S=s.S,act=L.actual(S);
+  const wrong=LAMPKEYS.filter(k=>(s.marks[k]==='on')!==!!act[k]);
+  const markOK=!wrong.length;
+  let k=-1;
+  for(let i=s.sub;i<st.subs.length;i++){const sb=st.subs[i];if(!failed(sb.chk,S,s.ctx).length&&lampsMatch(act,sb.on)){k=i;break;}}
+  if(k<0){
+    const sb=st.subs[s.sub];
+    if(!sb){msg('warn','Подэтапы выполнены','Все подэтапы этого этапа уже засчитаны. Нажмите «Этап выполнен».');return;}
+    if(markOK){
+      const f=failed(sb.chk,S,s.ctx);
+      msg('warn','Промежуточный контроль',`Состояние схемы описано верно, но условия подэтапа «${esc(sb.n)}» ещё не выполнены.`+(train()?(f.length?list(f):'<br>Положение элементов верное, но табло не соответствуют подэтапу: проверьте блинкеры или подождите 2 с.'):''));
+    }else{
+      if(train()){showDiff(wrong);msg('bad','Контроль неверный','Отмеченное не совпадает с тем, что сейчас на схеме. Неверно:'+list(wrong.map(x=>LAMPNAMES[x])));}
+      else{s.reg++;s.cur.extra++;msg('bad','Контроль неверный','Состояние схемы описано неверно.');renderErr();}
+    }
+    return;
+  }
+  if(!markOK&&train()){showDiff(wrong);msg('bad','Контроль неверный',`Действия подэтапа «${esc(st.subs[k].n)}» выполнены, но состояние схемы описано неверно. Исправьте:`+list(wrong.map(x=>LAMPNAMES[x])));return;}
+  const skipped=[];
+  for(let i=s.sub;i<k;i++){s.cur.subs[i].vyp='-';s.cur.subs[i].kon='-';s.reg++;skipped.push(st.subs[i].n);}
+  s.cur.subs[k].vyp='+';s.cur.subs[k].kon=markOK?'+':'-';if(!markOK)s.reg++;
+  s.sub=k+1;s.reveal=false;showDiff([]);
+  if(train()){
+    let t=`Подэтап «${esc(st.subs[k].n)}» засчитан.`;
+    if(skipped.length)t+=` Пропущен контроль: ${skipped.map(x=>'«'+esc(x)+'»').join(', ')}.`;
+    msg(skipped.length?'warn':'ok',skipped.length?'Есть пропуск':'Верно',t+(s.sub>=st.subs.length?' Нажмите «Этап выполнен».':''));
+  }else msg('', 'Контроль выполнен', `Принято: «${esc(st.subs[k].n)}».`);
+  refreshStage();
+}
+
+function doStage(){
+  const L=lab(),s=ses();if(!s.stage)return;
+  const st=s.stage,S=s.S;
+  if(L.kind==='stage'){
+    const act=L.actual(S);
+    const f=failed(st.chk,S,s.ctx);
+    const expDiff=Object.keys(st.exp).filter(k=>act[k]!==st.exp[k]);
+    const vyp=!f.length&&!expDiff.length;
+    const wrong=L.ctrl.map(g=>g.k).filter(k=>s.marks[k]!==act[k]);
+    const kon=!wrong.length;
+    if(train()&&(!vyp||!kon)&&!s.warn){
+      s.warn=true;showDiff(wrong);
+      let t='';
+      if(!vyp)t+='Этап выполнен не полностью:'+list(f.length?f:['Состояние табло или блинкера не то, что должно получиться на этом этапе']);
+      if(!kon)t+='Окно контроля не совпадает с тем, что на схеме. Неверно: '+esc(wrong.map(k=>L.ctrl.find(g=>g.k===k).t).join(', '))+'.';
+      msg('bad','Проверьте этап',t+'<br><span class="muted">Исправьте и нажмите «Этап выполнен» ещё раз. Если нажать без исправлений, этап засчитается с ошибкой.</span>');
+      return;
+    }
+    s.cur.vyp=vyp;s.cur.kon=kon;s.cur.marks={...s.marks};if(!vyp||!kon)s.reg++;
+    msg(vyp&&kon?'ok':'bad',vyp&&kon?'Этап выполнен':'Этап с ошибкой',`${esc(st.n)}: ${vyp?'выполнение верно':'выполнение неверно'}, ${kon?'контроль пройден':'контроль не пройден'}.`);
+  }else{
+    const rest=st.subs.slice(s.sub);
+    if(rest.length&&train()&&!s.warn){
+      s.warn=true;
+      msg('warn','Этап не закончен','Остались подэтапы без контроля:'+list(rest.map(x=>x.n))+'<span class="muted">Нажмите «Этап выполнен» ещё раз, чтобы всё равно завершить этап (подэтапы будут с минусом).</span>');
+      return;
+    }
+    for(let i=s.sub;i<st.subs.length;i++){s.cur.subs[i].vyp='-';s.cur.subs[i].kon='-';s.reg++;}
+    const ok=recOk(s.cur);
+    msg(ok?'ok':'bad',ok?'Этап выполнен':'Этап с ошибками',esc(st.n)+'.');
+  }
+  s.cur.closed=true;s.done[st.id]=true;s.stage=null;s.cur=null;s.warn=false;s.reveal=false;showDiff([]);
+  refreshStage();
+}
+
+function doAct(a){
+  const L=lab(),s=ses();
+  if(!s.stage){msg('warn','Сначала выберите этап','Действия на схеме выполняются только в рамках выбранного этапа. Выберите этап в списке.');return;}
+  const r=L.act(a,s.S,s)||{};
+  if(r.err){msg('warn','Нельзя',esc(r.err));return;}
+  if(r.log)addLog(r.log,r.merge);
+  if(r.gross){s.gross++;s.cur.notes.push(r.gross);msg('bad','Грубая ошибка',esc(r.gross));}
+  s.warn=false;
+  tick(0);renderErr();
+}
+
+/* ---------- протокол ---------- */
+function protocol(){
+  const L=lab(),s=ses();
+  let h=`<p><b>${esc(L.tab)}. ${esc(L.task)}</b><br>Режим: ${train()?'обучение':'экзамен'} · время работы ${hms(s.elapsed)} · ошибок: <b>${s.gross}/${s.reg}</b> <span class="muted">(грубые / обычные)</span></p>`;
+  const recs=s.recs;
+  if(!recs.length) h+='<p class="muted">Этапы ещё не выполнялись.</p>';
+  else if(L.kind==='stage'){
+    h+='<div class="tbl-wrap"><table class="proto"><thead><tr><th>Выбран этап</th><th>Выполнение</th><th>Контроль</th></tr></thead><tbody>';
+    recs.forEach(r=>{
+      if(r.type==='gross'){h+=`<tr class="gross"><td>${esc(r.n)}</td><td colspan="2">${esc(r.msg)} — <b class="badt">Грубая ошибка</b></td></tr>`;return;}
+      const fin=r.closed;
+      h+=`<tr><td>${esc(r.n)}</td><td><div class="acts">${esc(r.actions.join('\n')||'—')}</div>${fin?(r.vyp?'<b class="okt">Этап выполнен</b>':'<b class="badt">Этап не выполнен</b>'):'<span class="muted">этап не завершён</span>'}</td><td>${fin?`<div class="acts">${esc(markText(L.ctrl,r.marks).join('\n'))}</div>${r.kon?'<b class="okt">Контроль пройден</b>':'<b class="badt">Контроль не пройден</b>'}`:'—'}</td></tr>`;
+    });
+    h+='</tbody></table></div>';
+  }else{
+    h+='<div class="tbl-wrap"><table class="proto"><thead><tr><th>Выбранный этап / грубые ошибки</th><th>Подэтап</th><th>Выполнение</th><th>Контроль</th></tr></thead><tbody>';
+    recs.forEach(r=>{
+      if(r.type==='gross'){h+=`<tr class="gross"><td><b>${esc(r.n)}</b></td><td colspan="3">${esc(r.msg)} — <b class="badt">Грубая ошибка</b></td></tr>`;return;}
+      const n=r.subs.length+(r.extra?1:0);
+      r.subs.forEach((x,i)=>{
+        const pm=v=>v?`<td class="pm ${v==='+'?'plus':'minus'}">${v}</td>`:'<td class="pm muted">·</td>';
+        h+='<tr>'+(i===0?`<td rowspan="${n}"><b>${esc(r.n)}</b>${r.notes.map(t=>`<br><span class="badt">${esc(t)} — Грубая ошибка</span>`).join('')}${r.closed?'':'<br><span class="muted">этап не завершён</span>'}</td>`:'')+`<td>${esc(x.n)}</td>${pm(x.vyp)}${pm(x.kon)}</tr>`;
+      });
+      if(r.extra)h+=`<tr><td colspan="3" class="badt">Неверный контроль вне подэтапа: ${r.extra}</td></tr>`;
+    });
+    h+='</tbody></table></div>';
+  }
+  const miss=L.stages.filter(x=>!s.done[x.id]&&!(s.stage&&s.stage.id===x.id));
+  if(miss.length)h+=`<p><b>Не выполнялись:</b> ${miss.map(x=>esc(x.n)).join('; ')}.</p>`;
+  $('#proto').innerHTML=h;$('#overlay').hidden=false;$('#btn-close').focus();
+}
+
+/* ---------- цикл симуляции ---------- */
+function tick(dt){
+  const L=lab(),s=ses();
+  if(dt>0){s.elapsed+=dt;}
+  L.step(s.S,dt,s,sys);
+  L.render(s.S,train());
+  const sig=s.S.sig||{},hl=train();
+  for(const w of wires)w.classList.toggle('on',hl&&!!sig[w.dataset.s]);
+  $('#time').textContent=hms(s.elapsed);
+}
+let last=performance.now();
+setInterval(()=>{const now=performance.now();const dt=Math.min(0.5,(now-last)/1000);last=now;tick(dt);},100);
+
+/* ---------- события ---------- */
+buildTabs();
+$('#lab-tabs').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.lab===app.lab)return;app.lab=b.dataset.lab;store.set('tz.lab',app.lab);buildLab();};
+$('#mode-tabs').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.mode===app.mode)return;app.mode=b.dataset.mode;store.set('tz.mode',app.mode);app.ses={};buildLab();msg('', 'Режим: '+(train()?'обучение':'экзамен'),train()?'Подсказки, подсветка сигналов на схеме и разбор ошибок включены. Начинаем заново.':'Без подсказок и подсветки, этапы в списке перемешаны, ошибки засчитываются сразу. Начинаем заново.');};
+$('#stage-sel').onchange=e=>{selectStage(e.target.value);};
+$('#btn-stage').onclick=doStage;
+$('#btn-ctrl').onclick=doControl;
+$('#btn-finish').onclick=protocol;
+$('#btn-close').onclick=()=>{$('#overlay').hidden=true;};
+const restart=()=>{app.ses[app.lab]=newSes(app.lab);$('#overlay').hidden=true;buildLab();};
+$('#btn-again').onclick=restart;
+$('#btn-reset').onclick=restart;
+$('#overlay').onclick=e=>{if(e.target.id==='overlay')$('#overlay').hidden=true;};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').hidden=true;});
+$('#scheme').addEventListener('click',e=>{const g=e.target.closest('[data-act]');if(g)doAct(g.dataset.act);});
+$('#scheme').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const g=e.target.closest('[data-act]');if(g){e.preventDefault();doAct(g.dataset.act);}});
+
+/* хук для автопроверки */
+window.__tz={advance(sec){for(let t=0;t<sec;t+=0.1)tick(0.1);},act:doAct,sel:selectStage,ctrl:doControl,stage:doStage,
+  mark(m){Object.assign(ses().marks,m);buildCtrl();},ses,lab:()=>app.lab,setLab(id){app.lab=id;buildLab();},setMode(m){app.mode=m;app.ses={};buildLab();},proto:protocol};
+
+buildLab();
+})();
+</script>
+
+</body>
+</html>
